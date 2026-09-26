@@ -1,0 +1,10 @@
+{
+  "name": "devlog",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "today": "node src/index.js",
+    "dry": "node src/index.js --dry",
+    "weekly": "node src/index.js --weekly"
+  }
+}
