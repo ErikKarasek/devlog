@@ -12,7 +12,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DEV = join(homedir(), 'Developer');
 const AUTHORS = ['erikkarasek@centrum.cz', '40054004+ErikKarasek@users.noreply.github.com'];
-const SKIP_REPOS = new Set(['devlog']);
+// Vlastní automatické commity (zápisy a reporty) nejsou práce, kód devlogu ano.
+const AUTO_COMMITS = ['--invert-grep', '--extended-regexp', '--grep=^(log|review): [0-9]{4}-[0-9]{2}-[0-9]{2}$'];
 
 const args = process.argv.slice(2);
 const dry = args.includes('--dry');
@@ -55,7 +56,7 @@ function git(repo, ...a) {
 
 function repos() {
   return readdirSync(DEV, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && !SKIP_REPOS.has(e.name) && existsSync(join(DEV, e.name, '.git')))
+    .filter((e) => e.isDirectory() && existsSync(join(DEV, e.name, '.git')))
     .map((e) => e.name);
 }
 
@@ -67,7 +68,7 @@ function commitsFor(day) {
     let log;
     try {
       log = git(repo, 'log', '--all', '--no-merges', `--since=${day} 00:00`, `--until=${addDays(day, 1)} 00:00`,
-        ...AUTHORS.map((a) => `--author=${a}`), '--date=format:%H:%M', '--format=%H%x1f%ad%x1f%s%x1f%b%x1e');
+        ...AUTHORS.map((a) => `--author=${a}`), ...AUTO_COMMITS, '--date=format:%H:%M', '--format=%H%x1f%ad%x1f%s%x1f%b%x1e');
     } catch {
       continue;
     }
