@@ -29,7 +29,20 @@ still written with the raw log.
 ## Schedule
 
 `~/Library/LaunchAgents/com.erikkarasek.devlog.plist` runs `scripts/daily.sh`
-at 21:00. If the Mac is asleep then, launchd runs it on wake.
+at 21:00: the daily entry, then the code review, with `caffeinate` keeping the Mac
+awake until both finish. If the Mac is asleep, launchd runs it on wake and the
+entry catches up on the days it missed.
+
+To have the Mac wake up for it (macOS allows one repeating wake a day, needs admin):
+
+```bash
+sudo pmset repeat wakeorpoweron MTWRFSU 20:59:00
+pmset -g sched          # check
+sudo pmset repeat cancel  # undo
+```
+
+Works reliably on power; on battery with the lid closed macOS may put it back to
+sleep early.
 
 ```bash
 launchctl load ~/Library/LaunchAgents/com.erikkarasek.devlog.plist
@@ -39,8 +52,8 @@ tail out/daily.log
 
 ## Nightly code review
 
-`src/review.js` runs at 3:00 (launchd `com.erikkarasek.devlog-review`; if the Mac
-is asleep it runs on wake, so the report is there in the morning). For every repo
+`src/review.js` runs right after the daily entry, in the same 21:00 job, so a
+single scheduled wake is enough. For every repo
 with my commits since the last run it starts `claude -p` inside that repo, where
 it can read the code and the project's CLAUDE.md but only run `git show/diff/log`,
 and asks for real problems: bugs, security holes, leftovers, risky untested logic.
