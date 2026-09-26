@@ -13,7 +13,9 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DEV = join(homedir(), 'Developer');
 const AUTHORS = ['erikkarasek@centrum.cz', '40054004+ErikKarasek@users.noreply.github.com'];
 // Vlastní automatické commity (zápisy a reporty) nejsou práce, kód devlogu ano.
-const AUTO_COMMITS = ['--invert-grep', '--extended-regexp', '--grep=^(log|review): [0-9]{4}-[0-9]{2}-[0-9]{2}$'];
+// Filtruje se až tady: gitové --extended-regexp by platilo i pro --author a "+" v noreply
+// adrese by pak z hledání vyřadilo všechny commity.
+const AUTO_COMMIT = /^(log|review): \d{4}-\d{2}-\d{2}$/;
 
 const args = process.argv.slice(2);
 const dry = args.includes('--dry');
@@ -68,11 +70,12 @@ function commitsFor(day) {
     let log;
     try {
       log = git(repo, 'log', '--all', '--no-merges', `--since=${day} 00:00`, `--until=${addDays(day, 1)} 00:00`,
-        ...AUTHORS.map((a) => `--author=${a}`), ...AUTO_COMMITS, '--date=format:%H:%M', '--format=%H%x1f%ad%x1f%s%x1f%b%x1e');
+        ...AUTHORS.map((a) => `--author=${a}`), '--date=format:%H:%M', '--format=%H%x1f%ad%x1f%s%x1f%b%x1e');
     } catch {
       continue;
     }
-    const commits = log.split('\x1e').map((r) => r.trim()).filter(Boolean).map((r) => {
+    const commits = log.split('\x1e').map((r) => r.trim()).filter(Boolean)
+      .filter((r) => !AUTO_COMMIT.test(r.split('\x1f')[2])).map((r) => {
       const [hash, time, subject, body] = r.split('\x1f');
       const stat = git(repo, 'show', '--shortstat', '--format=', hash).trim();
       return { hash: hash.slice(0, 7), time, subject, body: body?.trim() ?? '', stat };

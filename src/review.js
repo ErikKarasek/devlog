@@ -13,7 +13,9 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DEV = join(homedir(), 'Developer');
 const AUTHORS = ['erikkarasek@centrum.cz', '40054004+ErikKarasek@users.noreply.github.com'];
 // Vlastní automatické commity (zápisy a reporty) nejsou práce, kód devlogu ano.
-const AUTO_COMMITS = ['--invert-grep', '--extended-regexp', '--grep=^(log|review): [0-9]{4}-[0-9]{2}-[0-9]{2}$'];
+// Filtruje se až tady: gitové --extended-regexp by platilo i pro --author a "+" v noreply
+// adrese by pak z hledání vyřadilo všechny commity.
+const AUTO_COMMIT = /^(log|review): \d{4}-\d{2}-\d{2}$/;
 const STATE = join(ROOT, 'out', 'review-state.json');
 
 const args = process.argv.slice(2);
@@ -52,9 +54,11 @@ function changedRepos(from) {
     let log = '';
     try {
       log = git(repo, 'log', '--all', '--no-merges', `--since=${from.toISOString()}`,
-        ...AUTHORS.map((a) => `--author=${a}`), ...AUTO_COMMITS, '--format=%h %s').trim();
+        ...AUTHORS.map((a) => `--author=${a}`), '--format=%h %s').trim();
     } catch {}
-    if (log) out.push({ name: e.name, repo, commits: log.split('\n').reverse() });
+    // Formát je "hash subject", automatický commit se pozná podle subjectu.
+    const commits = log ? log.split('\n').filter((l) => !AUTO_COMMIT.test(l.slice(l.indexOf(' ') + 1))).reverse() : [];
+    if (commits.length) out.push({ name: e.name, repo, commits });
   }
   return out;
 }
