@@ -221,7 +221,7 @@ function publish(files, message) {
   if (git(ROOT, 'remote').trim()) git(ROOT, 'push', '-q');
 }
 
-// Které dny zapsat. launchd pouští --catch-up: když Mac ve 21:00 spal a běh se spustí až
+// Které dny zapsat. launchd pouští --catch-up ve 3:00: zapíše včerejšek, a když Mac spal a běh se spustí až
 // po probuzení (klidně druhý den ráno), doplní se každý den od posledního zápisu. Před 20:00
 // dnešek ještě neskončil, takže se končí včerejškem. Nejvýš týden zpátky.
 function datesToWrite() {
