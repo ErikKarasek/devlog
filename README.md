@@ -34,6 +34,22 @@ launchctl start com.erikkarasek.devlog   # run now
 tail out/daily.log
 ```
 
+## Nightly code review
+
+`src/review.js` runs at 3:00 (launchd `com.erikkarasek.devlog-review`; if the Mac
+is asleep it runs on wake, so the report is there in the morning). For every repo
+with my commits since the last run it starts `claude -p` inside that repo, where
+it can read the code and the project's CLAUDE.md but only run `git show/diff/log`,
+and asks for real problems: bugs, security holes, leftovers, risky untested logic.
+No style advice.
+
+The full report goes to `reviews/2026/2026-09-27.md`, Telegram gets the list of
+findings per repo.
+
+```bash
+node src/review.js --dry --hours 24   # try it on the last day, write nothing
+```
+
 ## Telegram (optional)
 
 Sends each entry to your phone.
