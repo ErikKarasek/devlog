@@ -4,7 +4,7 @@ A daily work log written from my git commits across every repo in `~/Developer`,
 plus an "Other work" section from that day's Claude Code chats (read from
 `~/.claude/projects`, which Claude Code keeps for 30 days; nothing is copied, and
 tokens or keys pasted into a chat are redacted before anything is sent).
-Every evening at 21:00 it collects the day's commits, has Claude write a short
+Every night at 3:00 it collects the previous day's commits, has Claude write a short
 English summary, commits it here and pushes. On Sundays it also writes a weekly
 review with a LinkedIn draft.
 
@@ -29,31 +29,28 @@ still written with the raw log.
 ## Schedule
 
 `~/Library/LaunchAgents/com.erikkarasek.devlog.plist` runs `scripts/daily.sh`
-at 21:00: the daily entry, then the code review, with `caffeinate` keeping the Mac
-awake until both finish. If the Mac is asleep, launchd runs it on wake and the
-entry catches up on the days it missed.
+at 3:00: yesterday's entry (catching up on any days the Mac slept through), then
+the code review. `caffeinate` and LidRun's "keep awake while claude runs" rule keep
+the Mac up until both finish; then, if nobody has touched it for 10 minutes, it
+goes back to sleep (`pmset sleepnow`).
 
 To have the Mac wake up for it (macOS allows one repeating wake a day, needs admin):
 
 ```bash
-sudo pmset repeat wakeorpoweron MTWRFSU 20:59:00
-pmset -g sched          # check
+sudo pmset repeat wakeorpoweron MTWRFSU 02:59:00
+pmset -g sched            # check
 sudo pmset repeat cancel  # undo
 ```
 
-Works reliably on power; on battery with the lid closed macOS may put it back to
-sleep early.
-
 ```bash
-launchctl load ~/Library/LaunchAgents/com.erikkarasek.devlog.plist
 launchctl start com.erikkarasek.devlog   # run now
-tail out/daily.log
+tail out/daily.log out/review.log
 ```
 
 ## Nightly code review
 
-`src/review.js` runs right after the daily entry, in the same 21:00 job, so a
-single scheduled wake is enough. For every repo
+`src/review.js` runs right after the daily entry, in the same 3:00 job, so a
+single scheduled wake is enough and late-evening work is in both. For every repo
 with my commits since the last run it starts `claude -p` inside that repo, where
 it can read the code and the project's CLAUDE.md but only run `git show/diff/log`,
 and asks for real problems: bugs, security holes, leftovers, risky untested logic.
