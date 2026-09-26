@@ -3,7 +3,7 @@
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 cd "${0:A:h}/.." || exit 1
 
-if node src/index.js; then
+if node src/index.js --catch-up; then
   last=$(head -1 out/last.txt 2>/dev/null)
   if [[ -n "$last" ]]; then
     osascript -e "display notification \"Dnešní zápis je hotový\" with title \"Devlog\" sound name \"Glass\""

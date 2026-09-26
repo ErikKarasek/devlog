@@ -3,6 +3,7 @@
 //   node src/index.js 2026-09-25   konkrétní den
 //   node src/index.js --weekly     vynutí týdenní souhrn
 //   node src/index.js --dry        jen vypíše, nic nezapíše ani nepushne
+//   node src/index.js --catch-up   jak ho pouští launchd: doplní i dny, které prospal
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -20,8 +21,8 @@ const AUTO_COMMIT = /^(log|review): \d{4}-\d{2}-\d{2}$/;
 
 const args = process.argv.slice(2);
 const dry = args.includes('--dry');
-const date = args.find((a) => /^\d{4}-\d{2}-\d{2}$/.test(a)) ?? ymd(new Date());
 const forceWeekly = args.includes('--weekly');
+const STATE = join(ROOT, 'out', 'daily-state.json');
 
 loadEnv();
 
@@ -220,29 +221,55 @@ function publish(files, message) {
   if (git(ROOT, 'remote').trim()) git(ROOT, 'push', '-q');
 }
 
+// Které dny zapsat. launchd pouští --catch-up: když Mac ve 21:00 spal a běh se spustí až
+// po probuzení (klidně druhý den ráno), doplní se každý den od posledního zápisu. Před 20:00
+// dnešek ještě neskončil, takže se končí včerejškem. Nejvýš týden zpátky.
+function datesToWrite() {
+  const explicit = args.find((a) => /^\d{4}-\d{2}-\d{2}$/.test(a));
+  if (explicit) return [explicit];
+  const today = ymd(new Date());
+  if (!args.includes('--catch-up')) return [today];
+  const end = new Date().getHours() >= 20 ? today : addDays(today, -1);
+  let last = null;
+  try {
+    last = JSON.parse(readFileSync(STATE, 'utf8')).lastDay;
+  } catch {}
+  let day = last ? addDays(last, 1) : end;
+  if (day < addDays(end, -6)) day = addDays(end, -6);
+  const days = [];
+  for (; day <= end; day = addDays(day, 1)) days.push(day);
+  return days;
+}
+
 const written = [];
-const projects = commitsFor(date);
-const chats = chatsFor(date);
-if (projects.length || chats.length) {
-  const text = daily(date, projects, chats);
-  if (dry) console.log(text);
-  else {
-    written.push(write(`entries/${date.slice(0, 4)}/${date}.md`, text));
-    await telegram(text);
+const days = datesToWrite();
+for (const date of days) {
+  const projects = commitsFor(date);
+  const chats = chatsFor(date);
+  if (projects.length || chats.length) {
+    const text = daily(date, projects, chats);
+    if (dry) console.log(text);
+    else {
+      written.push(write(`entries/${date.slice(0, 4)}/${date}.md`, text));
+      await telegram(text);
+    }
+  } else {
+    console.log(`${date}: žádné commity ani chaty, zápis přeskakuji`);
   }
-} else {
-  console.log(`${date}: žádné commity ani chaty, zápis přeskakuji`);
-}
 
-if (forceWeekly || new Date(`${date}T12:00:00`).getDay() === 0) {
-  const w = weekly(date);
-  if (w && dry) console.log(w.text);
-  else if (w) {
-    written.push(write(`weekly/${w.week}.md`, w.text));
-    await telegram(w.text);
+  if (forceWeekly || new Date(`${date}T12:00:00`).getDay() === 0) {
+    const w = weekly(date);
+    if (w && dry) console.log(w.text);
+    else if (w) {
+      written.push(write(`weekly/${w.week}.md`, w.text));
+      await telegram(w.text);
+    }
   }
+  if (!dry && args.includes('--catch-up')) writeFileSync(STATE, JSON.stringify({ lastDay: date }));
 }
+if (!days.length) console.log('nic k doplnění, poslední den už je zapsaný');
 
-if (!dry && written.length) publish(written, `log: ${date}`);
+const lastDay = days[days.length - 1];
+if (!dry && written.length) publish(written, `log: ${lastDay}`);
 // Pro daily.sh: co otevřít a jestli vůbec notifikovat.
 if (!dry) writeFileSync(join(ROOT, 'out', 'last.txt'), written.join('\n'));
