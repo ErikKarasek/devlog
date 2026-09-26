@@ -173,15 +173,25 @@ ${entries.join('\n\n---\n\n')}`;
   return { week, text: claude(prompt) };
 }
 
+// Telegram Markdown neumí, jeho HTML podmnožina stačí na nadpisy, tučné a kód.
+function toTelegramHtml(md) {
+  return md
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/^#{1,3} (.+)$/gm, '<b>$1</b>')
+    .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^- /gm, '• ');
+}
+
 async function telegram(text) {
   const { TELEGRAM_BOT_TOKEN: token, TELEGRAM_CHAT_ID: chat } = process.env;
   if (!token || !chat) return;
   // Telegram bere max 4096 znaků, raw log posílat nemusí.
-  const body = text.split('\n## Raw log')[0].slice(0, 4000);
+  const body = toTelegramHtml(text.split('\n## Raw log')[0]).slice(0, 4000);
   const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chat_id: chat, text: body, disable_web_page_preview: true }),
+    body: JSON.stringify({ chat_id: chat, text: body, parse_mode: 'HTML', disable_web_page_preview: true }),
   });
   if (!res.ok) console.error(`telegram: ${res.status} ${await res.text()}`);
 }
