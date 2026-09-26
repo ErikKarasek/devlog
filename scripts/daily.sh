@@ -1,8 +1,8 @@
 #!/bin/zsh
 # Pouští launchd ve 3:00: deník za včerejšek (--catch-up doplní i prospané dny) a hned po
 # něm code review, obojí tak zachytí celý večer. Mac se na to probouzí přes
-# `pmset repeat` ve 2:59 (viz README). Vzhůru ho drží caffeinate a LidRun (pravidlo na
-# proces claude), po doběhnutí se zase uspí. launchd má holý PATH, proto ho nastavujeme.
+# `pmset repeat` ve 2:59 (viz README). Vzhůru ho drží caffeinate (LidRun, pokud zrovna běží,
+# pomůže, ale není potřeba), po doběhnutí se zase uspí. launchd má holý PATH, nastavujeme ho.
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 cd "${0:A:h}/.." || exit 1
 
