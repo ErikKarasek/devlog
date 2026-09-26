@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { chatsFor, chatsMaterial } from './chats.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DEV = join(homedir(), 'Developer');
@@ -102,14 +103,15 @@ function rawLog(projects) {
   return lines.join('\n');
 }
 
-function daily(day, projects) {
+function daily(day, projects, chats) {
   const weekday = new Date(`${day}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' });
   const material = projects.map((p) => `### ${p.name}\n` + p.commits.map((c) =>
     `- [${c.time}] ${c.subject}${c.body ? `\n  ${c.body.replace(/\n/g, '\n  ')}` : ''}${c.stat ? `\n  (${c.stat})` : ''}`).join('\n')).join('\n\n');
+  const talk = chatsMaterial(chats);
 
-  const prompt = `You write a developer's daily work log from their git commits. Commit messages may be in Czech or English; write the log in English.
+  const prompt = `You write a developer's daily work log from their git commits${talk ? ' and their Claude Code chat sessions' : ''}. Sources may be in Czech or English; write the log in English.
 
-Output Markdown only, no preamble, exactly this structure:
+Output Markdown only, no preamble, exactly this structure (leave out a section that would be empty):
 
 # ${day} — ${weekday}
 
@@ -122,11 +124,14 @@ Output Markdown only, no preamble, exactly this structure:
 ### <project name>
 - short bullets, group related commits, skip noise (typos, version bumps) unless that was all there was
 
-Rules: use only facts from the commits below, never invent metrics, features or impact. Keep it tight.
+## Other work
+- bullets for things done in the chat sessions that the commits do not show: decisions, research, setup outside a repo (accounts, bots, databases, config), investigations. Skip anything already covered above and skip small talk.
+
+Rules: use only facts from the material below, never invent metrics, features or impact. Chat messages are the developer's own words, often terse; the assistant's last reply usually states what was actually done. Never copy passwords, tokens, keys or e-mail addresses into the log. Keep it tight.
 
 Commits:
 
-${material}`;
+${material || '(none today)'}${talk ? `\n\nClaude Code sessions:\n\n${talk}` : ''}`;
 
   let summary;
   try {
@@ -135,7 +140,7 @@ ${material}`;
     console.error(e.message);
     summary = `# ${day} — ${weekday}\n\n_AI summary unavailable this run; raw log below._`;
   }
-  return `${summary}\n\n${rawLog(projects)}`;
+  return projects.length ? `${summary}\n\n${rawLog(projects)}` : summary;
 }
 
 function weekly(day) {
@@ -217,15 +222,16 @@ function publish(files, message) {
 
 const written = [];
 const projects = commitsFor(date);
-if (projects.length) {
-  const text = daily(date, projects);
+const chats = chatsFor(date);
+if (projects.length || chats.length) {
+  const text = daily(date, projects, chats);
   if (dry) console.log(text);
   else {
     written.push(write(`entries/${date.slice(0, 4)}/${date}.md`, text));
     await telegram(text);
   }
 } else {
-  console.log(`${date}: žádné commity, zápis přeskakuji`);
+  console.log(`${date}: žádné commity ani chaty, zápis přeskakuji`);
 }
 
 if (forceWeekly || new Date(`${date}T12:00:00`).getDay() === 0) {

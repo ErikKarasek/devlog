@@ -1,6 +1,9 @@
 # devlog
 
-A daily work log written from my git commits across every repo in `~/Developer`.
+A daily work log written from my git commits across every repo in `~/Developer`,
+plus an "Other work" section from that day's Claude Code chats (read from
+`~/.claude/projects`, which Claude Code keeps for 30 days; nothing is copied, and
+tokens or keys pasted into a chat are redacted before anything is sent).
 Every evening at 21:00 it collects the day's commits, has Claude write a short
 English summary, commits it here and pushes. On Sundays it also writes a weekly
 review with a LinkedIn draft.
