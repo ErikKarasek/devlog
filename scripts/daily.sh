@@ -6,7 +6,9 @@
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 cd "${0:A:h}/.." || exit 1
 
-caffeinate -i -w $$ &
+# -i: neuspat kvůli nečinnosti; -s: neuspat vůbec, i se zavřeným víkem (macOS to dodrží
+# jen v nabíječce). Na baterii se běh ve spánku jen pozastaví a doběhne po probuzení.
+caffeinate -i -s -w $$ &
 
 if node src/index.js --catch-up; then
   last=$(head -1 out/last.txt 2>/dev/null)
