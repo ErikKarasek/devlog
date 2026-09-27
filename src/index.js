@@ -135,13 +135,15 @@ Commits:
 ${material || '(none today)'}${talk ? `\n\nClaude Code sessions:\n\n${talk}` : ''}`;
 
   let summary;
+  let ok = true;
   try {
     summary = claude(prompt);
   } catch (e) {
     console.error(e.message);
+    ok = false;
     summary = `# ${day} — ${weekday}\n\n_AI summary unavailable this run; raw log below._`;
   }
-  return projects.length ? `${summary}\n\n${rawLog(projects)}` : summary;
+  return { ok, text: projects.length ? `${summary}\n\n${rawLog(projects)}` : summary };
 }
 
 function weekly(day) {
@@ -198,12 +200,17 @@ async function telegram(text) {
   if (!token || !chat) return;
   // Telegram bere max 4096 znaků, raw log posílat nemusí.
   const body = toTelegramHtml(text.split('\n## Raw log')[0]).slice(0, 4000);
-  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chat_id: chat, text: body, parse_mode: 'HTML', disable_web_page_preview: true }),
-  });
-  if (!res.ok) console.error(`telegram: ${res.status} ${await res.text()}`);
+  // Výpadek sítě nesmí shodit smyčku: zapsané dny by pak nedošly do publish().
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ chat_id: chat, text: body, parse_mode: 'HTML', disable_web_page_preview: true }),
+    });
+    if (!res.ok) console.error(`telegram: ${res.status} ${await res.text()}`);
+  } catch (e) {
+    console.error(`telegram: ${e.message}`);
+  }
 }
 
 function write(rel, text) {
@@ -243,11 +250,16 @@ function datesToWrite() {
 
 const written = [];
 const days = datesToWrite();
+// Když AI shrnutí selže (ve 3:00 po probuzení ještě často nejede síť), zápis se uloží
+// s raw logem, ale den se neoznačí jako hotový: příští --catch-up ho napíše znovu.
+// Pozdější dny se nechají na příště, stav jde jen po souvislé řadě hotových dnů.
+let failed = false;
 for (const date of days) {
   const projects = commitsFor(date);
   const chats = chatsFor(date);
   if (projects.length || chats.length) {
-    const text = daily(date, projects, chats);
+    const { ok, text } = daily(date, projects, chats);
+    if (!ok) failed = true;
     if (dry) console.log(text);
     else {
       written.push(write(`entries/${date.slice(0, 4)}/${date}.md`, text));
@@ -257,14 +269,20 @@ for (const date of days) {
     console.log(`${date}: žádné commity ani chaty, zápis přeskakuji`);
   }
 
-  if (forceWeekly || new Date(`${date}T12:00:00`).getDay() === 0) {
-    const w = weekly(date);
-    if (w && dry) console.log(w.text);
-    else if (w) {
-      written.push(write(`weekly/${w.week}.md`, w.text));
-      await telegram(w.text);
+  if (!failed && (forceWeekly || new Date(`${date}T12:00:00`).getDay() === 0)) {
+    try {
+      const w = weekly(date);
+      if (w && dry) console.log(w.text);
+      else if (w) {
+        written.push(write(`weekly/${w.week}.md`, w.text));
+        await telegram(w.text);
+      }
+    } catch (e) {
+      console.error(`týdenní souhrn: ${e.message}`);
+      failed = true;
     }
   }
+  if (failed) break;
   if (!dry && args.includes('--catch-up')) writeFileSync(STATE, JSON.stringify({ lastDay: date }));
 }
 if (!days.length) console.log('nic k doplnění, poslední den už je zapsaný');
@@ -273,3 +291,5 @@ const lastDay = days[days.length - 1];
 if (!dry && written.length) publish(written, `log: ${lastDay}`);
 // Pro daily.sh: co otevřít a jestli vůbec notifikovat.
 if (!dry) writeFileSync(join(ROOT, 'out', 'last.txt'), written.join('\n'));
+// Nenulový kód: daily.sh pak nepošle signál do site-watch a přijde upozornění.
+if (failed) process.exitCode = 1;

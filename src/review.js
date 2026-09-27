@@ -100,6 +100,8 @@ What is wrong and what it breaks, in 1–3 sentences. Then a concrete fix in one
   return text.slice(Math.max(0, text.indexOf('## ')));
 }
 
+const failedSection = (s) => /^## .+\n\n⚠️ Review failed/.test(s);
+
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 // Do Telegramu jen přehled: kolik čeho v kterém repu a názvy nálezů. Detail je v souboru.
@@ -109,7 +111,7 @@ function digest(date, sections) {
     const name = s.match(/^## (.+)$/m)?.[1] ?? '?';
     const findings = [...s.matchAll(/^### (.+)$/gm)].map((m) => m[1]);
     // Jen vlastní hláška z review(); nález může tu frázi citovat (stalo se u devlogu).
-    if (s.startsWith(`## ${name}\n\n⚠️ Review failed`)) lines.push(`⚠️ <b>${esc(name)}</b>: review selhalo`);
+    if (failedSection(s)) lines.push(`⚠️ <b>${esc(name)}</b>: review selhalo`);
     else if (!findings.length) lines.push(`✅ <b>${esc(name)}</b>: v pořádku`);
     else {
       lines.push(`<b>${esc(name)}</b>`);
@@ -135,8 +137,12 @@ const from = since();
 const repos = changedRepos(from);
 console.log(`${startedAt.toISOString()} review od ${from.toISOString()}: ${repos.map((r) => `${r.name} (${r.commits.length})`).join(', ') || 'nic'}`);
 
+// Když review některého repa selže, stav se neposune (commity přijdou na řadu příště)
+// a skript skončí nenulově, takže daily.sh nepošle signál do site-watch.
+let failed = false;
 if (repos.length) {
   const sections = repos.map(review);
+  failed = sections.some(failedSection);
   const p = (n) => String(n).padStart(2, '0');
   const date = `${startedAt.getFullYear()}-${p(startedAt.getMonth() + 1)}-${p(startedAt.getDate())}`;
   const report = `# Code review ${date}\n\nCommits since ${from.toISOString().slice(0, 16).replace('T', ' ')} UTC.\n\n${sections.join('\n\n')}\n`;
@@ -154,4 +160,5 @@ if (repos.length) {
 }
 
 // Ruční --hours okno neposouvá stav, aby noční běh nic nepřeskočil.
-if (!dry && !hours) writeFileSync(STATE, JSON.stringify({ lastRun: startedAt.toISOString() }));
+if (!dry && !hours && !failed) writeFileSync(STATE, JSON.stringify({ lastRun: startedAt.toISOString() }));
+if (failed) process.exitCode = 1;

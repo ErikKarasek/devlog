@@ -12,7 +12,7 @@ caffeinate -i -s -w $$ &
 
 # Hlídač automatizací (site-watch) se ozve v Telegramu, když tenhle signál do 10:00 nepřijde.
 beat() {
-  local key=$(grep '^BEAT_KEY=' .env | cut -d= -f2-)
+  local key=$(grep '^BEAT_KEY=' .env | cut -d= -f2- | tr -d "\"' \r")  # uvozovky a mezery pryč, jako v loadEnv
   [[ -n "$key" ]] && curl -fsS -m 15 -X POST -H "x-beat-key: $key" "https://site-watch.erikkarasek2005.workers.dev/beat/$1" >/dev/null
 }
 ok=1

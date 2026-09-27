@@ -58,7 +58,9 @@ export function chatsFor(day) {
         if (e.type === 'user' && !e.isMeta) {
           const t = textOf(e.message?.content).trim();
           // <...> na začátku jsou systémové vložky (připomínky, výstupy příkazů), ne člověk.
-          if (t && !t.startsWith('<')) prompts.push(t.replace(/\s+/g, ' ').slice(0, 300));
+          // Maskovat před zkrácením: token useknutý na hraně by byl kratší než minimum
+          // v redact() a prošel by do logu na GitHubu.
+          if (t && !t.startsWith('<')) prompts.push(redact(t.replace(/\s+/g, ' ')).slice(0, 300));
         }
         if (e.type === 'assistant') {
           const t = textOf(e.message?.content).trim();
@@ -69,8 +71,8 @@ export function chatsFor(day) {
         sessions.push({
           project: cwd ? basename(cwd) : dir,
           title,
-          prompts: prompts.slice(0, MAX_PROMPTS).map(redact),
-          outcome: redact(lastReply.slice(0, 1500)),
+          prompts: prompts.slice(0, MAX_PROMPTS),
+          outcome: redact(lastReply).slice(0, 1500),
         });
       }
     }

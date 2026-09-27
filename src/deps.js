@@ -16,7 +16,7 @@ const dry = process.argv.includes('--dry');
 
 for (const line of existsSync(join(ROOT, '.env')) ? readFileSync(join(ROOT, '.env'), 'utf8').split('\n') : []) {
   const m = line.match(/^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/);
-  if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+  if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
 }
 
 // Jen repa, kde jsem za posledních 90 dní commitnul: naklonované cizí projekty mě nezajímají.
@@ -64,6 +64,7 @@ function check(name) {
 
   return {
     name,
+    auditFailed: !audit,
     pm: pnpm ? 'pnpm' : 'npm',
     critical: counts.critical ?? 0,
     high: counts.high ?? 0,
@@ -81,14 +82,28 @@ const repos = readdirSync(DEV, { withFileTypes: true })
   .map((e) => e.name)
   .filter((n) => mine(join(DEV, n)));
 
-const results = repos.map(check).filter(Boolean).sort((a, b) => b.critical - a.critical || b.high - a.high);
+// Jeden rozbitý package.json nesmí shodit report pro všechna ostatní repa.
+const broken = [];
+const safeCheck = (name) => {
+  try {
+    return check(name);
+  } catch (e) {
+    broken.push(name);
+    console.error(`${name}: ${e.message}`);
+    return null;
+  }
+};
+const results = repos.map(safeCheck).filter(Boolean).sort((a, b) => b.critical - a.critical || b.high - a.high);
 const lines = ['<b>📦 Týdenní kontrola balíčků</b>', ''];
 for (const r of results) {
-  const sec = r.critical || r.high ? `🔴 ${r.critical} kritických, ${r.high} vážných` : r.moderate ? `🟡 ${r.moderate} středních` : '✅ bez známých chyb';
+  // Bez výsledku auditu (offline, chyba) nic nevíme; "bez chyb" by bylo falešné uklidnění.
+  const sec = r.auditFailed ? '⚠️ audit selhal'
+    : r.critical || r.high ? `🔴 ${r.critical} kritických, ${r.high} vážných` : r.moderate ? `🟡 ${r.moderate} středních` : '✅ bez známých chyb';
   lines.push(`<b>${esc(r.name)}</b>: ${sec} · zastaralých ${r.outdated}`);
   if (r.top.length) lines.push(`  ${r.top.map((t) => `${esc(t.name)} (${t.severity})`).join(', ')}`);
   if (r.major.length) lines.push(`  nová hlavní verze: ${esc(r.major.join(', '))}`);
 }
+if (broken.length) lines.push(`⚠️ nešlo zkontrolovat: ${esc(broken.join(', '))}`);
 lines.push('', '<i>Nic se neaktualizovalo. Bezpečné opravy: <code>npm audit fix</code> / <code>pnpm audit --fix</code> v repu, pak testy.</i>');
 const text = lines.join('\n');
 
