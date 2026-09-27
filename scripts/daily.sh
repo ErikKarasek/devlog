@@ -3,7 +3,7 @@
 # něm code review, obojí tak zachytí celý večer. Mac se na to probouzí přes
 # `pmset repeat` ve 2:59 (viz README). Vzhůru ho drží caffeinate (LidRun, pokud zrovna běží,
 # pomůže, ale není potřeba), po doběhnutí se zase uspí. launchd má holý PATH, nastavujeme ho.
-export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 cd "${0:A:h}/.." || exit 1
 
 # -i: neuspat kvůli nečinnosti; -s: neuspat vůbec, i se zavřeným víkem (macOS to dodrží
@@ -38,7 +38,7 @@ fi
 
 # Uspat, jen když Mac nikdo nepoužívá (10 min bez klávesnice a myši), ať to neuspí
 # někoho, kdo ve tři ráno ještě pracuje. pmset sleepnow nepotřebuje sudo.
-idle=$(ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}')
+idle=$(/usr/sbin/ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}')
 if (( idle >= 600 )); then
   echo "$(date '+%F %T') hotovo, nečinný ${idle}s, uspávám"
   pmset sleepnow
