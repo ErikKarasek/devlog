@@ -63,6 +63,17 @@ findings per repo.
 node src/review.js --dry --hours 24   # try it on the last day, write nothing
 ```
 
+## Weekly package check
+
+On Monday nights (inside the same 3:00 job) `src/deps.js` runs `npm`/`pnpm audit`
+and `outdated` in every repo I've committed to in the last 90 days and sends a
+short report: vulnerabilities by severity with the worst packages, how many are
+outdated, and which have a new major version. Report only; it never updates.
+
+```bash
+node src/deps.js --dry
+```
+
 ## Telegram (optional)
 
 Sends each entry to your phone.

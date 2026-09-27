@@ -28,6 +28,12 @@ fi
 node src/review.js >> out/review.log 2>&1 \
   || { ok=0; osascript -e "display notification \"Code review selhalo – mrkni do out/review.log\" with title \"Devlog\""; }
 
+# V noci na pondělí i týdenní report balíčků (jen report, nic neaktualizuje).
+if [[ $(date +%u) == 1 ]]; then
+  node src/deps.js >> out/deps.log 2>&1 \
+    || osascript -e "display notification \"Kontrola balíčků selhala – mrkni do out/deps.log\" with title \"Devlog\""
+fi
+
 (( ok )) && beat devlog
 
 # Uspat, jen když Mac nikdo nepoužívá (10 min bez klávesnice a myši), ať to neuspí
