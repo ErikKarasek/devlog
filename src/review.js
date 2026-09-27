@@ -108,7 +108,8 @@ function digest(date, sections) {
   for (const s of sections) {
     const name = s.match(/^## (.+)$/m)?.[1] ?? '?';
     const findings = [...s.matchAll(/^### (.+)$/gm)].map((m) => m[1]);
-    if (s.includes('⚠️ Review failed')) lines.push(`⚠️ <b>${esc(name)}</b>: review selhalo`);
+    // Jen vlastní hláška z review(); nález může tu frázi citovat (stalo se u devlogu).
+    if (s.startsWith(`## ${name}\n\n⚠️ Review failed`)) lines.push(`⚠️ <b>${esc(name)}</b>: review selhalo`);
     else if (!findings.length) lines.push(`✅ <b>${esc(name)}</b>: v pořádku`);
     else {
       lines.push(`<b>${esc(name)}</b>`);
