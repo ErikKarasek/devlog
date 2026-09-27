@@ -10,15 +10,25 @@ cd "${0:A:h}/.." || exit 1
 # jen v nabíječce). Na baterii se běh ve spánku jen pozastaví a doběhne po probuzení.
 caffeinate -i -s -w $$ &
 
+# Hlídač automatizací (site-watch) se ozve v Telegramu, když tenhle signál do 10:00 nepřijde.
+beat() {
+  local key=$(grep '^BEAT_KEY=' .env | cut -d= -f2-)
+  [[ -n "$key" ]] && curl -fsS -m 15 -X POST -H "x-beat-key: $key" "https://site-watch.erikkarasek2005.workers.dev/beat/$1" >/dev/null
+}
+ok=1
+
 if node src/index.js --catch-up; then
   last=$(head -1 out/last.txt 2>/dev/null)
   [[ -n "$last" ]] && osascript -e "display notification \"Zápis je hotový\" with title \"Devlog\" sound name \"Glass\""
 else
+  ok=0
   osascript -e "display notification \"Běh selhal – mrkni do out/daily.log\" with title \"Devlog\""
 fi
 
 node src/review.js >> out/review.log 2>&1 \
-  || osascript -e "display notification \"Code review selhalo – mrkni do out/review.log\" with title \"Devlog\""
+  || { ok=0; osascript -e "display notification \"Code review selhalo – mrkni do out/review.log\" with title \"Devlog\""; }
+
+(( ok )) && beat devlog
 
 # Uspat, jen když Mac nikdo nepoužívá (10 min bez klávesnice a myši), ať to neuspí
 # někoho, kdo ve tři ráno ještě pracuje. pmset sleepnow nepotřebuje sudo.
