@@ -44,6 +44,28 @@ function json(cmd, args, cwd) {
 
 const RANK = { critical: 4, high: 3, moderate: 2, low: 1, info: 0 };
 
+// npm audit neumí advisory ignorovat. Balíček je zranitelný přes `via`: buď přímo advisory,
+// nebo jméno jiného zranitelného balíčku (newman → postman-collection → faker). Když se
+// ignorované advisories vynechají, závažnost se přepočítá celým řetězcem.
+function npmVulns(vulns, ignored) {
+  const memo = new Map();
+  const severity = (name, seen = new Set()) => {
+    if (memo.has(name)) return memo.get(name);
+    if (seen.has(name) || !vulns[name]) return null;
+    seen.add(name);
+    let best = null;
+    for (const v of vulns[name].via) {
+      const s = typeof v === 'string' ? severity(v, seen) : ignored.some((g) => v.url?.endsWith(g)) ? null : v.severity;
+      if (s && (!best || RANK[s] > RANK[best])) best = s;
+    }
+    memo.set(name, best);
+    return best;
+  };
+  return Object.entries(vulns)
+    .map(([n, v]) => ({ name: n, severity: severity(n), direct: v.isDirect }))
+    .filter((w) => w.severity);
+}
+
 function check(name) {
   const repo = join(DEV, name);
   const pkg = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8'));
@@ -51,11 +73,13 @@ function check(name) {
   const pnpm = existsSync(join(repo, 'pnpm-lock.yaml'));
 
   const audit = pnpm ? json('pnpm', ['audit', '--json'], repo) : json('npm', ['audit', '--json'], repo);
-  const counts = audit?.metadata?.vulnerabilities ?? {};
   // Nejhorší balíčky podle závažnosti; npm a pnpm je popisují jinak.
   const worst = pnpm
     ? Object.values(audit?.advisories ?? {}).map((a) => ({ name: a.module_name, severity: a.severity }))
-    : Object.entries(audit?.vulnerabilities ?? {}).map(([n, v]) => ({ name: n, severity: v.severity, direct: v.isDirect }));
+    : npmVulns(audit?.vulnerabilities ?? {}, Object.keys(pkg.auditIgnore ?? {}));
+  // Počítá se z nalezených, ne z metadata: to obsahuje i advisories opravené patchem
+  // (pnpm: auditConfig.ignoreGhsas, npm: pole auditIgnore v package.json).
+  const counts = worst.reduce((c, w) => ({ ...c, [w.severity]: (c[w.severity] ?? 0) + 1 }), {});
   const top = [...new Map(worst.sort((a, b) => RANK[b.severity] - RANK[a.severity]).map((w) => [w.name, w])).values()]
     .filter((w) => RANK[w.severity] >= 3).slice(0, 4);
 
