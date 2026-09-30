@@ -4,7 +4,8 @@
 //   node src/index.js --weekly     vynutí týdenní souhrn
 //   node src/index.js --dry        jen vypíše, nic nezapíše ani nepushne
 //   node src/index.js --catch-up   jak ho pouští launchd: doplní i dny, které prospal
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
+import { ask } from './ai.js';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -88,10 +89,9 @@ function commitsFor(day) {
 }
 
 function claude(prompt) {
-  const r = spawnSync('claude', ['-p', '--model', 'sonnet', '--tools', '', '--strict-mcp-config', '--no-session-persistence'],
-    { input: prompt, encoding: 'utf8', timeout: 5 * 60_000, maxBuffer: 10 * 1024 * 1024 });
-  if (r.status !== 0 || !r.stdout.trim()) throw new Error(`claude selhal: ${r.stderr || r.error?.message || 'prázdný výstup'}`);
-  return r.stdout.trim();
+  const r = ask(prompt, { claudeArgs: ['-p', '--model', 'sonnet', '--tools', '', '--strict-mcp-config', '--no-session-persistence'] });
+  if (!r.ok) throw new Error(`claude selhal: ${r.err}`);
+  return r.text;
 }
 
 function rawLog(projects) {

@@ -3,7 +3,8 @@
 //   node src/review.js              commity od minulého běhu (poprvé posledních 24 h)
 //   node src/review.js --hours 48   vlastní okno, stav se neposune
 //   node src/review.js --dry        vypíše report, nic nezapíše ani nepošle
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
+import { ask } from './ai.js';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -91,12 +92,17 @@ Otherwise, for each finding:
 \`path/to/file:line\` · commit \`hash\`
 What is wrong and what it breaks, in 1–3 sentences. Then a concrete fix in one sentence.`;
 
-  const r = spawnSync('claude', ['-p', '--model', 'sonnet', '--tools', 'Read,Grep,Glob,Bash',
-    '--allowedTools', 'Read', 'Grep', 'Glob', 'Bash(git show:*)', 'Bash(git diff:*)', 'Bash(git log:*)',
-    '--permission-mode', 'dontAsk', '--setting-sources', 'project', '--strict-mcp-config', '--no-session-persistence'],
-  { cwd: repo, input: prompt, encoding: 'utf8', timeout: 15 * 60_000, maxBuffer: 20 * 1024 * 1024 });
-  if (r.status !== 0 || !r.stdout.trim()) return `## ${name}\n\n⚠️ Review failed: ${(r.stderr || r.error?.message || 'empty output').slice(0, 300)}`;
-  const text = r.stdout.trim();
+  // Antigravity in its sandbox (terminal restricted), else claude with only git show/diff/log.
+  const r = ask(prompt, {
+    cwd: repo,
+    timeoutMs: 15 * 60_000,
+    agyArgs: ['--sandbox', '--dangerously-skip-permissions'],
+    claudeArgs: ['-p', '--model', 'sonnet', '--tools', 'Read,Grep,Glob,Bash',
+      '--allowedTools', 'Read', 'Grep', 'Glob', 'Bash(git show:*)', 'Bash(git diff:*)', 'Bash(git log:*)',
+      '--permission-mode', 'dontAsk', '--setting-sources', 'project', '--strict-mcp-config', '--no-session-persistence'],
+  });
+  if (!r.ok) return `## ${name}\n\n⚠️ Review failed: ${r.err.slice(0, 300)}`;
+  const text = r.text;
   return text.slice(Math.max(0, text.indexOf('## ')));
 }
 
