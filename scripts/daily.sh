@@ -28,6 +28,9 @@ fi
 node src/review.js >> out/review.log 2>&1 \
   || { ok=0; osascript -e "display notification \"Code review selhalo – mrkni do out/review.log\" with title \"Devlog\""; }
 
+# Vážné nálezy z review jako úkoly pro agenta Fixer (Paperclip); opraví je v PR, mergeuje Erik.
+node src/review-tasks.js >> out/review.log 2>&1 || true
+
 # V noci na pondělí i týdenní report balíčků (jen report, nic neaktualizuje).
 if [[ $(date +%u) == 1 ]]; then
   node src/deps.js >> out/deps.log 2>&1 \
