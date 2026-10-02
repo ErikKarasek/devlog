@@ -8,6 +8,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fitLines } from './telegram.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DEV = join(homedir(), 'Developer');
@@ -137,7 +138,7 @@ else if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
   const res = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chat_id: process.env.TELEGRAM_CHAT_ID, text: text.slice(0, 4000), parse_mode: 'HTML' }),
+    body: JSON.stringify({ chat_id: process.env.TELEGRAM_CHAT_ID, text: fitLines(text), parse_mode: 'HTML' }),
   });
   if (!res.ok) throw new Error(`telegram ${res.status}: ${await res.text()}`);
   console.log(`${new Date().toISOString()} report balíčků odeslán (${results.length} rep)`);

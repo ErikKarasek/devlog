@@ -11,6 +11,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chatsFor, chatsMaterial } from './chats.js';
+import { fitLines } from './telegram.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DEV = join(homedir(), 'Developer');
@@ -191,7 +192,7 @@ function toTelegramHtml(md) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/^#{1,3} (.+)$/gm, '<b>$1</b>')
     .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
     .replace(/^- /gm, '• ');
 }
 
@@ -199,7 +200,7 @@ async function telegram(text) {
   const { TELEGRAM_BOT_TOKEN: token, TELEGRAM_CHAT_ID: chat } = process.env;
   if (!token || !chat) return;
   // Telegram bere max 4096 znaků, raw log posílat nemusí.
-  const body = toTelegramHtml(text.split('\n## Raw log')[0]).slice(0, 4000);
+  const body = fitLines(toTelegramHtml(text.split('\n## Raw log')[0]));
   // Výpadek sítě nesmí shodit smyčku: zapsané dny by pak nedošly do publish().
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {

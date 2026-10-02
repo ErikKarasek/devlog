@@ -5,6 +5,7 @@
 //   node src/review.js --dry        vypíše report, nic nezapíše ani nepošle
 import { execFileSync } from 'node:child_process';
 import { ask } from './ai.js';
+import { fitLines } from './telegram.js';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -124,7 +125,7 @@ function digest(date, sections) {
       for (const f of findings) lines.push(`  ${esc(f)}`);
     }
   }
-  return lines.join('\n').slice(0, 4000);
+  return fitLines(lines.join('\n'));
 }
 
 async function telegram(text) {
