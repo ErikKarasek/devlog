@@ -12,8 +12,9 @@ export function fitLines(html, max = 4000) {
   // Escaping makes it longer again (& is five characters): cut until the escaped text fits.
   let keep = max - 1;
   let out = escape(plain.slice(0, keep));
-  while (out.length > max - 1) {
-    keep -= out.length - (max - 1);
+  while (out.length > max - 1 && keep > 0) {
+    // Shrink in proportion, so a text full of & does not overshoot down to nothing.
+    keep = Math.min(keep - 1, Math.floor((keep * (max - 1)) / out.length));
     out = escape(plain.slice(0, keep));
   }
   return `${out}…`;
