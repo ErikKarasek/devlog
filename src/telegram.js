@@ -8,5 +8,13 @@ export function fitLines(html, max = 4000) {
   // One line longer than the limit: cutting it anywhere could split a tag or an entity, so it
   // goes as plain text, which beats a message that is only "…".
   const plain = html.replace(/<[^>]*>/g, '').replace(/&(lt|gt|quot|amp);/g, (_, e) => ({ lt: '<', gt: '>', quot: '"', amp: '&' })[e]);
-  return `${plain.slice(0, max - 1).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}…`;
+  const escape = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // Escaping makes it longer again (& is five characters): cut until the escaped text fits.
+  let keep = max - 1;
+  let out = escape(plain.slice(0, keep));
+  while (out.length > max - 1) {
+    keep -= out.length - (max - 1);
+    out = escape(plain.slice(0, keep));
+  }
+  return `${out}…`;
 }
